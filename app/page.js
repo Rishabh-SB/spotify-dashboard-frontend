@@ -11,7 +11,6 @@ import {
 } from '../lib/data';
 import styles from './page.module.css';
 
-// Loading component for dynamic imports
 const ChartLoading = () => (
   <div style={{ 
     display: 'flex', 
@@ -24,52 +23,129 @@ const ChartLoading = () => (
   </div>
 );
 
-// Dynamically import chart components to prevent SSR issues
-const Section1Charts = dynamic(() => import('../components/Section1Charts'), { 
-  ssr: false,
-  loading: () => <ChartLoading />
-});
-const Section2Charts = dynamic(() => import('../components/Section2Charts'), { 
-  ssr: false,
-  loading: () => <ChartLoading />
-});
-const Section3Charts = dynamic(() => import('../components/Section3Charts'), { 
-  ssr: false,
-  loading: () => <ChartLoading />
-});
-const Section4Charts = dynamic(() => import('../components/Section4Charts'), { 
-  ssr: false,
-  loading: () => <ChartLoading />
-});
-const Section5Charts = dynamic(() => import('../components/Section5Charts'), { 
-  ssr: false,
-  loading: () => <ChartLoading />
-});
+const Section1Charts = dynamic(() => import('../components/Section1Charts'), { ssr: false, loading: () => <ChartLoading /> });
+const Section2Charts = dynamic(() => import('../components/Section2Charts'), { ssr: false, loading: () => <ChartLoading /> });
+const Section3Charts = dynamic(() => import('../components/Section3Charts'), { ssr: false, loading: () => <ChartLoading /> });
+const Section4Charts = dynamic(() => import('../components/Section4Charts'), { ssr: false, loading: () => <ChartLoading /> });
+const Section5Charts = dynamic(() => import('../components/Section5Charts'), { ssr: false, loading: () => <ChartLoading /> });
+
+const inlineStyles = {
+  uploadForm: {
+    maxWidth: '600px',
+    margin: '2rem auto',
+    padding: '2rem',
+    background: 'var(--background)',
+    border: '1px solid #ccc',
+    borderRadius: '8px',
+    boxShadow: '0 4px 12px rgb(0 0 0 / 0.05)',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '1.5rem'
+  },
+  label: {
+    display: 'flex',
+    flexDirection: 'column',
+    fontWeight: '600',
+    color: 'var(--foreground)',
+    fontSize: '1.1rem'
+  },
+  input: {
+    marginTop: '0.4rem',
+    padding: '0.5rem 0.8rem',
+    fontSize: '1rem',
+    borderRadius: '4px',
+    border: '1px solid #bbb',
+    background: '#f9f9f9',
+    color: 'black',
+    transition: 'border 0.2s ease, background 0.2s ease'
+  },
+  button: {
+    padding: '0.75rem 1.2rem',
+    fontSize: '1.1rem',
+    borderRadius: '6px',
+    border: 'none',
+    background: '#667eea',
+    color: 'white',
+    fontWeight: '700',
+    cursor: 'pointer',
+    alignSelf: 'flex-start',
+    boxShadow: '0 2px 8px rgb(102 126 234 / 0.6)',
+    transition: 'background 0.3s ease'
+  }
+}
 
 export default function Home() {
+  const [files, setFiles] = useState([]);
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [datasetId, setDatasetId] = useState(null);
   const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
-    
-    // Load data from reply.json
-    fetch('/reply.json')
-      .then(response => response.json())
-      .then(data => {
-        setData(data);
-        setLoading(false);
-      })
-      .catch(err => {
-        console.error('Error loading data:', err);
-        setError(err.message);
-        setLoading(false);
-      });
   }, []);
 
-  // Prevent hydration mismatch by not rendering until mounted
+  const handleFileChange = (e) => {
+    setFiles(Array.from(e.target.files));
+  };
+
+  const uploadFiles = async () => {
+    if (files.length === 0) {
+      setError("Please select one or more JSON files to upload.");
+      return;
+    }
+    if (!startDate || !endDate) {
+      setError("Please select start and end dates.");
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    const formData = new FormData();
+    files.forEach(file => formData.append('files', file));
+    formData.append('start_date', startDate);
+    formData.append('end_date', endDate);
+
+    try {
+      const response = await fetch('http://localhost:8000/upload/', {
+        method: 'POST',
+        body: formData
+      });
+      if (!response.ok) {
+        throw new Error('Failed to upload files');
+      }
+      const result = await response.json();
+      if (result.error) {
+        throw new Error(result.error);
+      }
+      setDatasetId(result.dataset_id);
+      fetchMetrics(result.dataset_id);
+    } catch (err) {
+      setError(err.message);
+      setLoading(false);
+    }
+  };
+
+  const fetchMetrics = async (id) => {
+    try {
+      const url = new URL(`http://localhost:8000/metrics/${id}`);
+      if (startDate) url.searchParams.append("start_date", startDate);
+      if (endDate) url.searchParams.append("end_date", endDate);
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error("Failed to fetch metrics");
+      }
+      const metricsData = await response.json();
+      setData(metricsData);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (!mounted) {
     return (
       <div className={styles.loading}>
@@ -91,7 +167,7 @@ export default function Home() {
   if (error) {
     return (
       <div className={styles.error}>
-        <h2>Error loading data</h2>
+        <h2>Error</h2>
         <p>{error}</p>
       </div>
     );
@@ -99,16 +175,55 @@ export default function Home() {
 
   if (!data) {
     return (
-      <div className={styles.error}>
-        <h2>No data available</h2>
-        <p>Please ensure reply.json is available in the public directory.</p>
+      <div className={styles.dashboard}>
+        <header className={styles.header}>
+          <h1>🎵 Spotify Analytics Dashboard</h1>
+          <p>Upload your JSON data files to get started</p>
+        </header>
+        <main className={styles.main}>
+          <div style={inlineStyles.uploadForm}>
+            <label style={inlineStyles.label}>
+              Select JSON files (multiple allowed):
+              <input 
+                type="file" 
+                multiple 
+                accept=".json" 
+                onChange={handleFileChange} 
+                style={inlineStyles.input}
+              />
+            </label>
+
+            <label style={inlineStyles.label}>
+              Start Date:
+              <input 
+                type="date" 
+                value={startDate} 
+                onChange={e => setStartDate(e.target.value)} 
+                style={inlineStyles.input}
+              />
+            </label>
+
+            <label style={inlineStyles.label}>
+              End Date:
+              <input 
+                type="date" 
+                value={endDate} 
+                onChange={e => setEndDate(e.target.value)} 
+                style={inlineStyles.input}
+              />
+            </label>
+
+            <button onClick={uploadFiles} style={inlineStyles.button}>
+              Upload & Load Metrics
+            </button>
+          </div>
+        </main>
       </div>
     );
   }
 
-  // Process data with error handling
   let topEntitiesData, timeBasedData, userBehaviorData, platformData, sessionData;
-  
+
   try {
     topEntitiesData = processTopEntities(data);
     timeBasedData = processTimeBasedData(data);
@@ -116,8 +231,6 @@ export default function Home() {
     platformData = processPlatformData(data);
     sessionData = processSessionData(data);
   } catch (error) {
-    console.error('Error processing data:', error);
-    setError('Error processing analytics data. Please check the data format.');
     return (
       <div className={styles.error}>
         <h2>Data Processing Error</h2>
@@ -136,28 +249,23 @@ export default function Home() {
         <h1>🎵 Spotify Analytics Dashboard</h1>
         <p>Your personal music listening insights</p>
       </header>
-
       <main className={styles.main}>
         <section className={styles.section}>
           <h2>Section 1: Top Entities</h2>
           <Section1Charts data={topEntitiesData} />
         </section>
-
         <section className={styles.section}>
           <h2>Section 2: Time-Based Listening Patterns</h2>
           <Section2Charts data={timeBasedData} />
         </section>
-
         <section className={styles.section}>
           <h2>Section 3: User Behavior & Exploration</h2>
           <Section3Charts data={userBehaviorData} />
         </section>
-
         <section className={styles.section}>
           <h2>Section 4: Platform Usage</h2>
           <Section4Charts data={platformData} />
         </section>
-
         <section className={styles.section}>
           <h2>Section 5: Session Metrics</h2>
           <Section5Charts data={sessionData} />
