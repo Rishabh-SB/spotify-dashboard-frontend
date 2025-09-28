@@ -1,5 +1,5 @@
-'use client';
 /* eslint-disable react/display-name */
+'use client';
 
 import { 
   BarChart, 
