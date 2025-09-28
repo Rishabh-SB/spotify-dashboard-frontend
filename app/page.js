@@ -109,7 +109,7 @@ export default function Home() {
     formData.append('end_date', endDate);
 
     try {
-      const response = await fetch('https://chiragspotifydashboard.streamlit.app/upload/', {
+      const response = await fetch('http://spotifydashboardbackend-production.up.railway.app/upload/', {
         method: 'POST',
         body: formData
       });
@@ -130,7 +130,7 @@ export default function Home() {
 
   const fetchMetrics = async (id) => {
     try {
-      const url = new URL(`https://chiragspotifydashboard.streamlit.app/metrics/${id}`);
+      const url = new URL(`https://spotifydashboardbackend-production.up.railway.app/metrics/${id}`);
       if (startDate) url.searchParams.append("start_date", startDate);
       if (endDate) url.searchParams.append("end_date", endDate);
       const response = await fetch(url);
