@@ -1,4 +1,5 @@
 'use client';
+eslint-disable react/display-name
 
 import React from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Treemap } from 'recharts';
